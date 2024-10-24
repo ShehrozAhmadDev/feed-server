@@ -90,12 +90,10 @@ app.post("/calculate", (req, res) => {
     !selectedIngredients ||
     selectedIngredients.length === 0
   ) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "All input values are required, including at least one selected ingredient.",
-      });
+    return res.status(400).json({
+      error:
+        "All input values are required, including at least one selected ingredient.",
+    });
   }
 
   const result = calculateIngredients(
@@ -109,6 +107,10 @@ app.post("/calculate", (req, res) => {
   );
 
   res.json(result);
+});
+
+app.get("/", (req, res) => {
+  res.send("APP IS RUNNING");
 });
 
 const PORT = process.env.PORT || 4000;
