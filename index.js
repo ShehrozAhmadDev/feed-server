@@ -1,22 +1,20 @@
 const express = require("express");
-const cors = require("cors"); // Import cors
+const cors = require("cors");
 const solver = require("javascript-lp-solver");
 const ingredients = require("./ingredients");
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
-// Use CORS middleware to allow requests from other origins
-app.use(cors()); // Default allows all origins
-
-// Function to calculate optimal ingredient quantities based on desired macros, micros, and budget
 const calculateIngredients = (
   desiredProtein,
   desiredCarbs,
   desiredFats,
   desiredVitaminC,
   desiredCalcium,
-  budget
+  budget,
+  selectedIngredients
 ) => {
   const model = {
     optimize: "price",
@@ -32,7 +30,11 @@ const calculateIngredients = (
     variables: {},
   };
 
-  ingredients.forEach((ingredient) => {
+  const filteredIngredients = ingredients.filter((ingredient) =>
+    selectedIngredients.includes(ingredient.name)
+  );
+
+  filteredIngredients.forEach((ingredient) => {
     model.variables[ingredient.name] = {
       protein: ingredient.protein,
       carbs: ingredient.carbs,
@@ -45,7 +47,7 @@ const calculateIngredients = (
 
   const results = solver.Solve(model);
 
-  const usedIngredients = ingredients
+  const usedIngredients = filteredIngredients
     .filter(
       (ingredient) => results[ingredient.name] && results[ingredient.name] > 0
     )
@@ -57,14 +59,15 @@ const calculateIngredients = (
   const totalCost = usedIngredients.reduce((sum, ingredient) => {
     const quantity = results[ingredient.name];
     return (
-      sum + quantity * ingredients.find((i) => i.name === ingredient.name).price
+      sum +
+      quantity *
+        filteredIngredients.find((i) => i.name === ingredient.name).price
     );
   }, 0);
 
   return { usedIngredients, totalCost: totalCost.toFixed(2) };
 };
 
-// API route to get optimal ingredients and cost
 app.post("/calculate", (req, res) => {
   console.log(req.body);
   const {
@@ -74,6 +77,7 @@ app.post("/calculate", (req, res) => {
     desiredVitaminC,
     desiredCalcium,
     budget,
+    selectedIngredients,
   } = req.body;
 
   if (
@@ -82,9 +86,16 @@ app.post("/calculate", (req, res) => {
     !desiredFats ||
     !desiredVitaminC ||
     !desiredCalcium ||
-    !budget
+    !budget ||
+    !selectedIngredients ||
+    selectedIngredients.length === 0
   ) {
-    return res.status(400).json({ error: "All input values are required." });
+    return res
+      .status(400)
+      .json({
+        error:
+          "All input values are required, including at least one selected ingredient.",
+      });
   }
 
   const result = calculateIngredients(
@@ -93,13 +104,13 @@ app.post("/calculate", (req, res) => {
     desiredFats,
     desiredVitaminC,
     desiredCalcium,
-    budget
+    budget,
+    selectedIngredients
   );
 
   res.json(result);
 });
 
-// Start server
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
